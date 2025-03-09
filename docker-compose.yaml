@@ -1,0 +1,66 @@
+version: "2"
+services:
+  hive_metastore:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: metastore
+      MYSQL_USER: hive
+      MYSQL_PASSWORD: hivepassword
+    ports:
+      - 3307:3306
+  namenode:
+    image: hadoop-with-make
+    hostname: namenode
+    volumes:
+      - ./Makefile:/opt/hadoop/Makefile
+      - ./zeppelin-0.11.2-bin-all.tgz:/opt/hadoop/zeppelin-0.11.2-bin-all.tgz
+      - ./spark-3.5.0-bin-hadoop3.tgz:/opt/hadoop/spark-3.5.0-bin-hadoop3.tgz
+      - ./apache-hive-3.1.3-bin.tar.gz:/opt/hadoop/apache-hive-3.1.3-bin.tar.gz
+      - ./mysql-connector-java-8.0.28.jar:/opt/hadoop/mysql-connector-java-8.0.28.jar
+      - ./hive-site.xml:/opt/hadoop/hive-site.xml
+      - ./setup-hive-directories.sh:/opt/hadoop/setup-hive-directories.sh
+    ports:
+      - 9870:9870
+    env_file:
+      - ./config
+    environment:
+      ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
+    command: bash -c "sudo make install-spark && make install-python3 && make setup-zeppelin && make setup-hive && make start-namenode"
+  
+  datanode_1:
+    image: hadoop-with-make
+    command: [ "hdfs", "datanode" ]
+    env_file:
+      - ./config
+  
+  datanode_2:
+    image: hadoop-with-make
+    command: [ "hdfs", "datanode" ]
+    env_file:
+      - ./config
+  
+  resourcemanager:
+    image: hadoop-with-make
+    hostname: resourcemanager
+    command: [ "yarn", "resourcemanager" ]
+    ports:
+      - 8088:8088
+    env_file:
+      - ./config
+    volumes:
+      - ./test.sh:/opt/test.sh
+  
+  nodemanager:
+    image: hadoop-with-make
+    command: [ "yarn", "nodemanager" ]
+    env_file:
+      - ./config
+  
+  firefox:
+    image: jlesage/firefox
+    hostname: firefox
+    ports:
+      - 5800:5800
